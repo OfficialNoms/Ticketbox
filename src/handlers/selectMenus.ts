@@ -1,6 +1,7 @@
 import type { TextChannel, Interaction } from 'discord.js';
 import { getTicketByChannel, addParticipant, removeParticipant, memberIsModerator } from '../tickets';
 import { logAction } from '../log';
+import { updateAuditEntry } from '../audit';
 
 export async function handleUserSelectMenu(interaction: Interaction) {
   if (!interaction.isUserSelectMenu()) return false;
@@ -38,6 +39,9 @@ export async function handleUserSelectMenu(interaction: Interaction) {
         { name: 'Actor', value: `<@${interaction.user.id}>`, inline: true },
         { name: 'Participant', value: `<@${selected}>`, inline: true }
       ]);
+
+      const updated = getTicketByChannel(channel.id);
+      if (updated) await updateAuditEntry(interaction.guild, updated);
     } catch (err: any) {
       await interaction.update({ content: `Failed to add: ${err.message ?? 'unknown error'}`, components: [] });
     }
@@ -54,6 +58,9 @@ export async function handleUserSelectMenu(interaction: Interaction) {
         { name: 'Actor', value: `<@${interaction.user.id}>`, inline: true },
         { name: 'Participant', value: `<@${selected}>`, inline: true }
       ]);
+
+      const updated = getTicketByChannel(channel.id);
+      if (updated) await updateAuditEntry(interaction.guild, updated);
     } catch (err: any) {
       await interaction.update({ content: `Failed to remove: ${err.message ?? 'unknown error'}`, components: [] });
     }

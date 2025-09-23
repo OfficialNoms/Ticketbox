@@ -57,6 +57,20 @@ export function now(): number {
   return Math.floor(Date.now() / 1000);
 }
 
+/** Ensure a column exists; if missing, ALTER TABLE to add it. */
+function ensureColumn(table: string, column: string, decl: string) {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  const has = rows.some(r => r.name === column);
+  if (!has) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+  }
+}
+
+/* Migrations for audit log */
+ensureColumn('tickets', 'audit_message_id', 'TEXT');
+ensureColumn('tickets', 'closed_by_user_id', 'TEXT');
+ensureColumn('tickets', 'archived_by_user_id', 'TEXT');
+
 // Lightweight helpers used by settings.ts
 export const _getGuildConfig = db.prepare(`SELECT * FROM guild_config WHERE guild_id=?`);
 export const _upsertGuildConfig = db.prepare(`

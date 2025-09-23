@@ -16,6 +16,7 @@ import { listOnDutyMentions } from '../duty';
 import { logAction } from '../log';
 import { loadConfig } from '../config';
 import { ensureDeferred } from './common';
+import { updateAuditEntry, attachTranscriptHTML } from '../audit';
 
 const cfg = loadConfig();
 
@@ -89,6 +90,9 @@ export async function handleButton(interaction: Interaction) {
         { name: 'Ticket', value: `<#${channel.id}>` },
         { name: 'User', value: `<@${clicker}>`, inline: true }
       ]);
+
+      const updated = getTicketByChannel(channel.id);
+      if (updated) await updateAuditEntry(interaction.guild, updated);
     } catch (err: any) {
       await interaction.editReply({ content: `Failed: ${err.message ?? 'unknown error'}` });
     }
@@ -158,6 +162,9 @@ export async function handleButton(interaction: Interaction) {
         { name: 'Ticket', value: `<#${channel.id}>` },
         { name: 'Moderator', value: `<@${interaction.user.id}>`, inline: true }
       ]);
+
+      const updated = getTicketByChannel(channel.id);
+      if (updated) await updateAuditEntry(interaction.guild, updated);
     } catch (err: any) {
       await interaction.editReply({ content: `Failed: ${err.message ?? 'unknown error'}` });
     }
@@ -175,13 +182,16 @@ export async function handleButton(interaction: Interaction) {
       return true;
     }
     try {
-      await closeTicket(ticket.id, channel);
+      await closeTicket(ticket.id, channel, interaction.user.id);
       await refreshHeader(channel, ticket.id);
       await interaction.editReply({ content: '🧷 **Closed**. Channel is now read-only for everyone.' });
       await logAction(interaction.guild, 'MOD_CLOSE', [
         { name: 'Ticket', value: `<#${channel.id}>` },
         { name: 'Moderator', value: `<@${interaction.user.id}>`, inline: true }
       ]);
+
+      const updated = getTicketByChannel(channel.id);
+      if (updated) await updateAuditEntry(interaction.guild, updated);
     } catch (err: any) {
       await interaction.editReply({ content: `Failed: ${err.message ?? 'unknown error'}` });
     }
@@ -200,20 +210,30 @@ export async function handleButton(interaction: Interaction) {
     }
     try {
       const row = getTicketByChannel(channel.id)!;
-      await archiveTicket(ticket.id, channel, row);
+      await archiveTicket(ticket.id, channel, row, interaction.user.id);
       await refreshHeader(channel, ticket.id);
       await interaction.editReply({ content: '📦 **Archived**. Only staff retain access.' });
       await logAction(interaction.guild, 'MOD_ARCHIVE', [
         { name: 'Ticket', value: `<#${channel.id}>` },
         { name: 'Moderator', value: `<@${interaction.user.id}>`, inline: true }
       ]);
+
+      // Refresh audit entry (shows status + archiver)
+      let updated = getTicketByChannel(channel.id);
+      if (updated) await updateAuditEntry(interaction.guild, updated);
+
+      // Generate & attach transcript (stores URL and updates embed to include "Transcript" field)
+      updated = getTicketByChannel(channel.id);
+      if (updated) {
+        await attachTranscriptHTML(interaction.guild, updated);
+      }
     } catch (err: any) {
       await interaction.editReply({ content: `Failed: ${err.message ?? 'unknown error'}` });
     }
     return true;
   }
 
-  // MOD: reopen
+  // MOD: reopen — (policy: your UI controls now handle availability)
   if (interaction.customId === 'ticket:mod_reopen') {
     if (!member || !memberIsModerator(member)) {
       await interaction.editReply({ content: 'Moderator only.' });
@@ -233,6 +253,9 @@ export async function handleButton(interaction: Interaction) {
         { name: 'Ticket', value: `<#${channel.id}>` },
         { name: 'Moderator', value: `<@${interaction.user.id}>`, inline: true }
       ]);
+
+      const updated = getTicketByChannel(channel.id);
+      if (updated) await updateAuditEntry(interaction.guild, updated);
     } catch (err: any) {
       await interaction.editReply({ content: `Failed: ${err.message ?? 'unknown error'}` });
     }

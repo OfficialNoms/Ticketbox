@@ -4,6 +4,7 @@ export type { TicketState, TicketRow } from './types';
 // Store-level operations
 export {
   getTicketByChannel,
+  getTicketById,
   setTicketState,
   saveHeaderMessageId,
   writeParticipantList, // not used externally, but OK if needed
@@ -28,19 +29,28 @@ export { createUserTicket, createTicketForTarget } from './create';
 
 // Higher-level ticket ops that depend on multiple modules
 import type { TextChannel } from 'discord.js';
-import { setTicketState as _set, writeClosedAt, writeArchivedAt, parseParticipants } from './store';
+import {
+  setTicketState as _set,
+  writeClosedAt,
+  writeArchivedAt,
+  parseParticipants,
+  writeClosedByUserId,
+  writeArchivedByUserId,
+} from './store';
 import { setChannelReadOnlyAll as _readOnly, moveToArchive as _moveToArchive } from './permissions';
 import type { TicketRow } from './types';
 
-export async function closeTicket(ticketId: string, channel: TextChannel) {
+export async function closeTicket(ticketId: string, channel: TextChannel, closedByUserId: string) {
   _set(ticketId, 'CLOSED');
   writeClosedAt(ticketId);
+  writeClosedByUserId(ticketId, closedByUserId);
   await _readOnly(channel);
 }
 
-export async function archiveTicket(ticketId: string, channel: TextChannel, ticketRow: TicketRow) {
+export async function archiveTicket(ticketId: string, channel: TextChannel, ticketRow: TicketRow, archivedByUserId: string) {
   _set(ticketId, 'ARCHIVED');
   writeArchivedAt(ticketId);
+  writeArchivedByUserId(ticketId, archivedByUserId);
 
   // Remove opener, target, and added participants
   const toRemove = new Set<string>([
@@ -55,4 +65,3 @@ export async function archiveTicket(ticketId: string, channel: TextChannel, tick
   await _readOnly(channel);
   await _moveToArchive(channel);
 }
- 

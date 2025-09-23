@@ -11,6 +11,7 @@ import { buildHeaderEmbed, buildUserRow, buildModRow, buildParticipantRow } from
 import { logAction } from '../log';
 import { loadConfig } from '../config';
 import { memberIsModerator } from '../tickets';
+import { ensureAuditEntry } from '../audit';
 
 const cfg = loadConfig();
 
@@ -31,6 +32,9 @@ export async function handleTicketCommand(interaction: Interaction) {
       const msg = await sendHeader(channel as TextChannel, interaction.user.id, subject);
       const ticket = getTicketByChannel(channel.id)!;
       saveHeaderMessageId(ticket.id, msg.id);
+
+      // NEW: create (or re-link) the audit entry message
+      await ensureAuditEntry(interaction.guild, ticket);
 
       await interaction.editReply({ content: `Your ticket is ready: ${channel}` });
 
@@ -87,6 +91,9 @@ export async function handleTicketCommand(interaction: Interaction) {
 
       const t = getTicketByChannel(channel.id)!;
       saveHeaderMessageId(t.id, msg.id);
+
+      // NEW: create (or re-link) the audit entry message
+      await ensureAuditEntry(interaction.guild, t);
 
       await interaction.editReply({ content: `Opened ticket for ${target} → ${channel}` });
 
