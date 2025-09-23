@@ -1,0 +1,8 @@
+{
+  "moderatorRoleIds": ["1418596371925041294"],
+  "onDutyRoleId": "1419766746054918227",
+  "ticketsCategoryId": "1419773477208199189",
+  "ticketsArchiveCategoryId": "1419773552072327279",
+  "logChannelId": "1419773704828620903",
+  "fallbackPingModeratorIfNoOnDuty": true
+}
