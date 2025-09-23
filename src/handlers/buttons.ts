@@ -10,9 +10,8 @@ import {
   memberIsModerator,
   closeTicket,
   archiveTicket,
-  saveHeaderMessageId,
 } from '../tickets';
-import { buildUserRow, buildModRow, buildParticipantRow, buildHeaderEmbed, statusPill } from '../ui';
+import { statusPill } from '../ui';
 import { listOnDutyMentions } from '../duty';
 import { logAction } from '../log';
 import { loadConfig } from '../config';

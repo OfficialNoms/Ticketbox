@@ -1,37 +1,51 @@
-import type { Interaction } from 'discord.js';
-import { listOnDutyMentions, setDuty, syncOnDutyRole } from '../duty';
+import { Guild, GuildMember } from 'discord.js';
+import { db, now } from './db';
+import { loadConfig } from './config';
 
-export async function handleDutyCommand(interaction: Interaction) {
-  if (!interaction.isChatInputCommand() || interaction.commandName !== 'duty') return false;
-  if (!interaction.guild) {
-    await interaction.reply({ content: 'Use this in a server.', ephemeral: true });
-    return true;
+const cfg = loadConfig();
+
+const upsertDuty = db.prepare(`
+  INSERT INTO duty (guild_id, user_id, is_on_duty, updated_at)
+  VALUES (@guild_id, @user_id, @is_on_duty, @updated_at)
+  ON CONFLICT(guild_id, user_id) DO UPDATE SET
+    is_on_duty=excluded.is_on_duty,
+    updated_at=excluded.updated_at
+`);
+
+const selectOnDuty = db.prepare(`
+  SELECT user_id FROM duty WHERE guild_id = ? AND is_on_duty = 1
+`);
+
+export function setDuty(guildId: string, userId: string, isOn: boolean) {
+  upsertDuty.run({
+    guild_id: guildId,
+    user_id: userId,
+    is_on_duty: isOn ? 1 : 0,
+    updated_at: now()
+  });
+}
+
+export function getOnDutyUserIds(guildId: string): string[] {
+  return selectOnDuty.all(guildId).map(r => r.user_id as string);
+}
+
+// Optional role sync
+export async function syncOnDutyRole(member: GuildMember, isOn: boolean) {
+  const roleId = cfg.onDutyRoleId?.trim();
+  if (!roleId) return; // disabled
+
+  const role = member.guild.roles.cache.get(roleId) ?? await member.guild.roles.fetch(roleId).catch(() => null);
+  if (!role) return;
+
+  const has = member.roles.cache.has(role.id);
+  if (isOn && !has) {
+    await member.roles.add(role).catch(() => {});
+  } else if (!isOn && has) {
+    await member.roles.remove(role).catch(() => {});
   }
+}
 
-  const sub = interaction.options.getSubcommand();
-  await interaction.deferReply({ ephemeral: true });
-
-  if (sub === 'on' || sub === 'off') {
-    const isOn = sub === 'on';
-    setDuty(interaction.guild.id, interaction.user.id, isOn);
-    try {
-      const member = await interaction.guild.members.fetch(interaction.user.id);
-      await syncOnDutyRole(member, isOn);
-    } catch {}
-    await interaction.editReply({
-      content: isOn
-        ? 'You are now **On Duty**. You’ll be pinged for new tickets.'
-        : 'You are now **Off Duty**. You will not be pinged.'
-    });
-    return true;
-  }
-
-  if (sub === 'status') {
-    const mentions = await listOnDutyMentions(interaction.guild);
-    const msg = mentions.length ? `On-Duty: ${mentions.join(', ')}` : 'No one is currently On-Duty.';
-    await interaction.editReply({ content: msg });
-    return true;
-  }
-
-  return false;
+export async function listOnDutyMentions(guild: Guild): Promise<string[]> {
+  const ids = getOnDutyUserIds(guild.id);
+  return ids.map(id => `<@${id}>`);
 }
