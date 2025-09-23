@@ -23,7 +23,7 @@ const cfg = loadConfig();
 export async function handleButton(interaction: Interaction) {
   if (!interaction.isButton()) return false;
   if (!interaction.guild || !interaction.channel) {
-    await interaction.reply({ content: 'Use this in a server channel.', flags: 64 });
+    await interaction.reply({ content: 'Use this in a server channel.', ephemeral: true });
     return true;
   }
 
@@ -31,7 +31,7 @@ export async function handleButton(interaction: Interaction) {
   const channel = interaction.channel as TextChannel;
   const ticket = getTicketByChannel(channel.id);
   if (!ticket) {
-    await interaction.reply({ content: 'This is not a Ticketbox channel.', flags: 64 });
+    await interaction.reply({ content: 'This is not a Ticketbox channel.', ephemeral: true });
     return true;
   }
 

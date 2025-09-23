@@ -1,5 +1,5 @@
 import type { GuildMember, TextChannel, OverwriteResolvable } from 'discord.js';
-import { PermissionFlagsBits } from 'discord.js';
+import { PermissionFlagsBits, PermissionsBitField } from 'discord.js';
 import { loadConfig } from '../config';
 
 const cfg = loadConfig();
@@ -34,7 +34,10 @@ export async function moveToArchive(channel: TextChannel) {
 }
 
 export function memberIsModerator(member: GuildMember): boolean {
-  return cfg.moderatorRoleIds.some(rid => member.roles.cache.has(rid)) || member.permissions.has('Administrator');
+  return (
+    cfg.moderatorRoleIds.some(rid => member.roles.cache.has(rid)) ||
+    member.permissions.has(PermissionsBitField.Flags.Administrator)
+  );
 }
 
 /** Utility to build staff overwrites for a newly created channel. */

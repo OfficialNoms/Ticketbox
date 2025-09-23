@@ -1,11 +1,11 @@
 import type { Interaction, PermissionsBitField } from 'discord.js';
-import { PermissionsBitField as PBF, EmbedBuilder } from 'discord.js';
+import { PermissionsBitField as PBF, EmbedBuilder, ChannelType } from 'discord.js';
 import { getGuildSettings, setAuditLogChannel } from '../settings';
 
 export async function handleConfigCommand(interaction: Interaction) {
   if (!interaction.isChatInputCommand() || interaction.commandName !== 'config') return false;
   if (!interaction.guild) {
-    await interaction.reply({ content: 'Use this in a server.', flags: 64 });
+    await interaction.reply({ content: 'Use this in a server.', ephemeral: true });
     return true;
   }
 
@@ -14,12 +14,12 @@ export async function handleConfigCommand(interaction: Interaction) {
     member?.permissions.has(PBF.Flags.Administrator) ||
     member?.permissions.has(PBF.Flags.ManageGuild);
   if (!hasPerm) {
-    await interaction.reply({ content: 'You need **Administrator** or **Manage Server** to use /config.', flags: 64 });
+    await interaction.reply({ content: 'You need **Administrator** or **Manage Server** to use /config.', ephemeral: true });
     return true;
   }
 
   const sub = interaction.options.getSubcommand();
-  await interaction.deferReply({ flags: 64 });
+  await interaction.deferReply({ ephemeral: true });
 
   if (sub === 'show') {
     const g = getGuildSettings(interaction.guild.id);
@@ -41,7 +41,7 @@ export async function handleConfigCommand(interaction: Interaction) {
 
   if (sub === 'set_auditlog') {
     const ch = interaction.options.getChannel('channel', true);
-    if (ch.guildId !== interaction.guild.id || ch.type !== 0) {
+    if (ch.guildId !== interaction.guild.id || ch.type !== ChannelType.GuildText) {
       await interaction.editReply({ content: 'Please choose a text channel in this server.' });
       return true;
     }

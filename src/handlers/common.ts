@@ -4,7 +4,8 @@ export async function ensureDeferred(interaction: Interaction & { deferred?: boo
   if (!interaction.isRepliable()) return;
   if (!interaction.deferred && !interaction.replied) {
     try {
-      await interaction.deferReply({ flags: 64 }); // ephemeral ack
+      // Ephemeral defer for any interaction we handle
+      await interaction.deferReply({ ephemeral: true });
     } catch {
       // ignore if already acknowledged
     }

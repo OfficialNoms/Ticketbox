@@ -49,7 +49,7 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
 
   // Simple inline command: /ping
   if (interaction.isChatInputCommand() && interaction.commandName === 'ping') {
-    await interaction.reply({ content: 'pong', flags: 64 });
+    await interaction.reply({ content: 'pong', ephemeral: true });
     return;
   }
 

@@ -1,4 +1,5 @@
 import type { TextChannel } from 'discord.js';
+import { PermissionsBitField } from 'discord.js';
 import { loadConfig } from '../config';
 import { parseParticipants, writeParticipantList } from './store';
 import type { TicketRow } from './types';
@@ -24,7 +25,9 @@ export async function removeParticipant(channel: TextChannel, ticket: TicketRow,
   if (!guildMember) return;
 
   const isOpener = userId === ticket.creator_user_id || userId === ticket.target_user_id;
-  const isMod = cfg.moderatorRoleIds.some(rid => guildMember.roles.cache.has(rid)) || guildMember.permissions.has('Administrator');
+  const isMod =
+    cfg.moderatorRoleIds.some(rid => guildMember.roles.cache.has(rid)) ||
+    guildMember.permissions.has(PermissionsBitField.Flags.Administrator);
   if (isOpener || isMod) return;
 
   await channel.permissionOverwrites.delete(userId).catch(() => {});

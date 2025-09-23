@@ -17,7 +17,7 @@ const cfg = loadConfig();
 export async function handleTicketCommand(interaction: Interaction) {
   if (!interaction.isChatInputCommand() || interaction.commandName !== 'ticket') return false;
   if (!interaction.guild) {
-    await interaction.reply({ content: 'This command can only be used in a server.', flags: 64 });
+    await interaction.reply({ content: 'This command can only be used in a server.', ephemeral: true });
     return true;
   }
 
@@ -25,7 +25,7 @@ export async function handleTicketCommand(interaction: Interaction) {
 
   if (sub === 'open') {
     const subject = interaction.options.getString('subject') ?? null;
-    await interaction.deferReply({ flags: 64 });
+    await interaction.deferReply({ ephemeral: true });
     try {
       const channel = await createUserTicket(interaction.guild, interaction.user.id, subject ?? undefined);
       const msg = await sendHeader(channel as TextChannel, interaction.user.id, subject);
@@ -48,14 +48,14 @@ export async function handleTicketCommand(interaction: Interaction) {
   if (sub === 'openfor') {
     const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
     if (!member || !memberIsModerator(member)) {
-      await interaction.reply({ content: 'Moderator only.', flags: 64 });
+      await interaction.reply({ content: 'Moderator only.', ephemeral: true });
       return true;
     }
 
     const target = interaction.options.getUser('user', true);
     const subject = interaction.options.getString('subject') ?? null;
 
-    await interaction.deferReply({ flags: 64 });
+    await interaction.deferReply({ ephemeral: true });
     try {
       const channel = await createTicketForTarget(interaction.guild, interaction.user.id, target.id, subject ?? undefined);
 

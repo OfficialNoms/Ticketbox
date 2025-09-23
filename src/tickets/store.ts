@@ -5,11 +5,11 @@ import type { TicketRow, TicketState } from './types';
 const insertTicket = db.prepare(`
   INSERT INTO tickets (
     id, guild_id, channel_id, creator_user_id, target_user_id, subject, state,
-    created_at, updated_at, added_participants, header_message_id
+    created_at, updated_at, added_participants, transcript_url, header_message_id
   )
   VALUES (
     @id, @guild_id, @channel_id, @creator_user_id, @target_user_id, @subject, @state,
-    @created_at, @updated_at, @added_participants, @header_message_id
+    @created_at, @updated_at, @added_participants, @transcript_url, @header_message_id
   )
 `);
 const selectByChannel = db.prepare(`SELECT * FROM tickets WHERE channel_id = ?`);

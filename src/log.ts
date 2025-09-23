@@ -1,7 +1,18 @@
-import { EmbedBuilder, Guild, TextChannel } from 'discord.js';
-import { loadConfig } from './config';
+import { EmbedBuilder, Guild, TextChannel, ChannelType } from 'discord.js';
+import { getGuildSettings } from './settings';
 
-const cfg = loadConfig();
+async function getLogChannel(guild: Guild): Promise<TextChannel | null> {
+  const id = getGuildSettings(guild.id).log_channel_id?.trim();
+  if (!id) return null;
+
+  const cached = guild.channels.cache.get(id);
+  if (cached && cached.type === ChannelType.GuildText) return cached as TextChannel;
+
+  const fetched = await guild.channels.fetch(id).catch(() => null);
+  if (fetched && fetched.type === ChannelType.GuildText) return fetched as TextChannel;
+
+  return null;
+}
 
 export type LogEvent =
   | 'OPEN'
@@ -41,23 +52,12 @@ const TITLES: Record<LogEvent, string> = {
   REMOVE_PARTICIPANT: 'Participant Removed'
 };
 
-function getLogChannel(guild: Guild): TextChannel | null {
-  const id = cfg.logChannelId?.trim();
-  if (!id) return null;
-  const ch = guild.channels.cache.get(id);
-  if (ch && ch.isTextBased() && ch.isTextBased()) {
-    // types are messy; the cast is safe for guild text channels
-    return ch as TextChannel;
-  }
-  return null;
-}
-
 export async function logAction(
   guild: Guild,
   type: LogEvent,
   fields: { name: string; value: string; inline?: boolean }[],
 ) {
-  const channel = getLogChannel(guild);
+  const channel = await getLogChannel(guild);
   if (!channel) return; // no-op if misconfigured
 
   const embed = new EmbedBuilder()
