@@ -82,7 +82,7 @@ export async function handleTicketCommand(interaction: Interaction) {
       const msg = await (channel as TextChannel).send({
         content: pingText,
         embeds: [embed],
-        components: [buildUserRow('OPEN'), buildModRow('OPEN'), buildParticipantRow()]
+        components: [buildUserRow('OPEN'), buildModRow('OPEN'), buildParticipantRow('OPEN')]
       });
 
       const t = getTicketByChannel(channel.id)!;
@@ -119,7 +119,7 @@ async function sendHeader(channel: TextChannel, openerId: string, subject: strin
   const msg = await channel.send({
     content: pingText,
     embeds: [buildHeaderEmbed(openerId, subject, 'OPEN')],
-    components: [buildUserRow('OPEN'), buildModRow('OPEN'), buildParticipantRow()]
+    components: [buildUserRow('OPEN'), buildModRow('OPEN'), buildParticipantRow('OPEN')]
   });
   return msg;
 }

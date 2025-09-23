@@ -30,6 +30,7 @@ export function buildModRow(state: TicketState) {
   const isArchived = state === 'ARCHIVED';
 
   const disableAll = isArchived; // archived = nothing usable
+  const canReopen = (isClosed || isPending) && !isArchived; // spec: allow reopen when CLOSED or PENDING, not ARCHIVED
 
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
@@ -54,7 +55,7 @@ export function buildModRow(state: TicketState) {
     new ButtonBuilder()
       .setCustomId('ticket:mod_reopen')
       .setStyle(ButtonStyle.Success)
-      .setDisabled(true) // archived/closed reopen is not allowed by policy
+      .setDisabled(!canReopen)
       .setLabel('🛡️ Staff: Reopen')
   );
 }
