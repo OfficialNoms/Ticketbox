@@ -25,6 +25,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent, // ⬅️ allow reading message text for transcripts
   ],
   partials: [Partials.Channel],
 });

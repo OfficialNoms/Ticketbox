@@ -64,15 +64,12 @@ export async function updateAuditEntry(guild: Guild, row: TicketRow): Promise<vo
   const ch = await getAuditChannel(guild);
   if (!ch) return;
 
-  // Ensure an audit message exists
   const id = await ensureAuditEntry(guild, row);
   if (!id) return;
 
   const msg = await ch.messages.fetch(id).catch(() => null);
   const embed = buildAuditEmbed(row);
-  if (msg) {
-    await msg.edit({ embeds: [embed] });
-  }
+  if (msg) await msg.edit({ embeds: [embed] });
 }
 
 /** Generate a simple HTML transcript, attach it to the audit message, and persist the URL. */
@@ -86,35 +83,46 @@ export async function attachTranscriptHTML(guild: Guild, ticket: TicketRow): Pro
   const msg = await ch.messages.fetch(id).catch(() => null);
   if (!msg) return null;
 
-  // Pull channel messages and render minimal HTML
   const ticketChannel = guild.channels.cache.get(ticket.channel_id);
   if (!ticketChannel || ticketChannel.type !== ChannelType.GuildText) return null;
-
   const text = ticketChannel as TextChannel;
 
-  // Collect up to ~500 messages, oldest->newest
+  // Collect up to ~500 messages, oldest → newest
   const collected: any[] = [];
-  let lastId: string | undefined = undefined;
+  let beforeId: string | undefined = undefined;
   for (let i = 0; i < 5; i++) {
-    const batch = await text.messages.fetch({ limit: 100, before: lastId }).catch(() => null);
+    const batch = await text.messages.fetch({ limit: 100, before: beforeId }).catch(() => null);
     if (!batch || batch.size === 0) break;
-    const sorted = Array.from(batch.values()).sort((a, b) => a.createdTimestamp - b.createdTimestamp);
-    collected.push(...sorted);
-    lastId = sorted[0]?.id;
+    const msgs = Array.from(batch.values());
+    collected.push(...msgs);
+    const oldest = msgs.reduce((a, b) => (a.createdTimestamp < b.createdTimestamp ? a : b));
+    beforeId = oldest.id;
     if (batch.size < 100) break;
   }
+  collected.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
 
-  const escape = (s: string) =>
-    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const isSnowflake = (s: string | undefined) => !!s && /^\d+$/.test(s);
 
   const rows = collected.map(m => {
     const time = new Date(m.createdTimestamp).toISOString();
-    const author = m.author?.tag ?? m.author?.id ?? 'unknown';
+
+    // username, not nickname
+    const authorId = m.author?.id ?? '';
+    const username = ((m.author?.username ?? authorId) || 'unknown');
+
+    const authorAnchor = isSnowflake(authorId)
+      ? `<a class="a" href="https://discord.com/users/${authorId}" title="ID: ${authorId}">${escape(username)}</a>`
+      : `<span class="a">${escape(username)}</span>`;
+
+    const idSuffix = isSnowflake(authorId) ? ` <span class="uid">(${authorId})</span>` : '';
+
     const content = m.content ? escape(m.content) : '';
     const attachments = m.attachments?.size
       ? `<div class="atts">Attachments: ${Array.from(m.attachments.values()).map(a => `<a href="${a.url}">${escape(a.name ?? 'file')}</a>`).join(', ')}</div>`
       : '';
-    return `<div class="msg"><span class="t">${time}</span> <span class="a">${escape(author)}</span><div class="c">${content}</div>${attachments}</div>`;
+
+    return `<div class="msg"><span class="t">${time}</span> ${authorAnchor}${idSuffix}<div class="c">${content}</div>${attachments}</div>`;
   }).join('\n');
 
   const html = `<!doctype html>
@@ -126,7 +134,9 @@ body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto S
 h1{margin-top:0;font-size:20px;}
 .msg{padding:8px 0;border-bottom:1px solid #222;}
 .t{color:#9aa0a6;margin-right:8px;font-size:12px}
-.a{color:#8ab4f8}
+.a{color:#8ab4f8;text-decoration:none}
+.a:hover{text-decoration:underline}
+.uid{color:#9aa0a6;font-size:12px;margin-left:4px}
 .c{white-space:pre-wrap;margin-top:4px}
 .atts a{color:#8ab4f8}
 .meta{color:#9aa0a6;margin-bottom:12px}
@@ -143,10 +153,7 @@ ${rows}
   const url = edited?.attachments?.first()?.url ?? null;
 
   writeTranscriptUrl(ticket.id, url);
-  // Re-render embed to show the Transcript link field
   const updated = getTicketById(ticket.id);
-  if (updated) {
-    await updateAuditEntry(guild, updated);
-  }
+  if (updated) await updateAuditEntry(guild, updated);
   return url;
 }
