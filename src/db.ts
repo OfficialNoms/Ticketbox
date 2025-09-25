@@ -39,16 +39,17 @@ CREATE TABLE IF NOT EXISTS duty (
   PRIMARY KEY (guild_id, user_id)
 );
 
-/* NEW: per-guild config */
+/* Per-guild config */
 CREATE TABLE IF NOT EXISTS guild_config (
   guild_id TEXT PRIMARY KEY,
   moderator_role_ids TEXT,            -- JSON array of role IDs
   on_duty_role_id TEXT,               -- optional
   tickets_category_id TEXT,
   tickets_archive_category_id TEXT,
-  log_channel_id TEXT,                -- existing logs, if you use them
-  audit_log_channel_id TEXT,          -- NEW: channel where one-message-per-ticket lives
+  log_channel_id TEXT,                -- log channel for embeds
+  audit_log_channel_id TEXT,          -- one-message-per-ticket lives here
   fallback_ping_mod_if_no_on_duty INTEGER DEFAULT 1, -- 1=true, 0=false
+  transcript_enabled INTEGER DEFAULT 1,              -- NEW: toggle transcripts
   updated_at INTEGER NOT NULL
 );
 `);
@@ -66,22 +67,39 @@ function ensureColumn(table: string, column: string, decl: string) {
   }
 }
 
-/* Migrations for audit log */
+/* Migrations for audit log (tickets table) */
 ensureColumn('tickets', 'audit_message_id', 'TEXT');
 ensureColumn('tickets', 'closed_by_user_id', 'TEXT');
 ensureColumn('tickets', 'archived_by_user_id', 'TEXT');
+
+/* Migration for guild_config: transcripts toggle */
+ensureColumn('guild_config', 'transcript_enabled', 'INTEGER DEFAULT 1');
 
 // Lightweight helpers used by settings.ts
 export const _getGuildConfig = db.prepare(`SELECT * FROM guild_config WHERE guild_id=?`);
 export const _upsertGuildConfig = db.prepare(`
 INSERT INTO guild_config (
-  guild_id, moderator_role_ids, on_duty_role_id, tickets_category_id,
-  tickets_archive_category_id, log_channel_id, audit_log_channel_id,
-  fallback_ping_mod_if_no_on_duty, updated_at
+  guild_id,
+  moderator_role_ids,
+  on_duty_role_id,
+  tickets_category_id,
+  tickets_archive_category_id,
+  log_channel_id,
+  audit_log_channel_id,
+  fallback_ping_mod_if_no_on_duty,
+  transcript_enabled,
+  updated_at
 ) VALUES (
-  @guild_id, @moderator_role_ids, @on_duty_role_id, @tickets_category_id,
-  @tickets_archive_category_id, @log_channel_id, @audit_log_channel_id,
-  @fallback_ping_mod_if_no_on_duty, @updated_at
+  @guild_id,
+  @moderator_role_ids,
+  @on_duty_role_id,
+  @tickets_category_id,
+  @tickets_archive_category_id,
+  @log_channel_id,
+  @audit_log_channel_id,
+  @fallback_ping_mod_if_no_on_duty,
+  @transcript_enabled,
+  @updated_at
 )
 ON CONFLICT(guild_id) DO UPDATE SET
   moderator_role_ids=excluded.moderator_role_ids,
@@ -91,5 +109,6 @@ ON CONFLICT(guild_id) DO UPDATE SET
   log_channel_id=excluded.log_channel_id,
   audit_log_channel_id=excluded.audit_log_channel_id,
   fallback_ping_mod_if_no_on_duty=excluded.fallback_ping_mod_if_no_on_duty,
+  transcript_enabled=excluded.transcript_enabled,
   updated_at=excluded.updated_at
 `);
