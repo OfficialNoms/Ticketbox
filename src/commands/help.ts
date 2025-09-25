@@ -33,6 +33,6 @@ export async function handleHelpCommand(interaction: Interaction) {
     .setFooter({ text: 'Ticketbox' })
     .setTimestamp(new Date());
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: 64 });
   return true;
 }

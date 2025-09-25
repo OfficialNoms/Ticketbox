@@ -6,26 +6,26 @@ import { updateAuditEntry } from '../audit';
 export async function handleUserSelectMenu(interaction: Interaction) {
   if (!interaction.isUserSelectMenu()) return false;
   if (!interaction.guild || !interaction.channel) {
-    await interaction.reply({ content: 'Use this in a server channel.', ephemeral: true });
+    await interaction.reply({ content: 'Use this in a server channel.', flags: 64 });
     return true;
   }
 
   const channel = interaction.channel as TextChannel;
   const ticket = getTicketByChannel(channel.id);
   if (!ticket) {
-    await interaction.reply({ content: 'This is not a Ticketbox channel.', ephemeral: true });
+    await interaction.reply({ content: 'This is not a Ticketbox channel.', flags: 64 });
     return true;
   }
 
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
   if (!member || !memberIsModerator(member)) {
-    await interaction.reply({ content: 'Moderator only.', ephemeral: true });
+    await interaction.reply({ content: 'Moderator only.', flags: 64 });
     return true;
   }
 
   const selected = interaction.values?.[0];
   if (!selected) {
-    await interaction.reply({ content: 'No user selected.', ephemeral: true });
+    await interaction.reply({ content: 'No user selected.', flags: 64 });
     return true;
   }
 

@@ -4,12 +4,12 @@ import { listOnDutyMentions, setDuty, syncOnDutyRole } from '../duty';
 export async function handleDutyCommand(interaction: Interaction) {
   if (!interaction.isChatInputCommand() || interaction.commandName !== 'duty') return false;
   if (!interaction.guild) {
-    await interaction.reply({ content: 'Use this in a server.', ephemeral: true });
+    await interaction.reply({ content: 'Use this in a server.', flags: 64 });
     return true;
   }
 
   const sub = interaction.options.getSubcommand();
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   if (sub === 'on' || sub === 'off') {
     const isOn = sub === 'on';

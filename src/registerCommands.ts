@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { REST, Routes, SlashCommandBuilder, ChannelType } from 'discord.js';
+import { REST, Routes, SlashCommandBuilder } from 'discord.js';
 
 const token = process.env.DISCORD_TOKEN!;
 const clientId = process.env.CLIENT_ID!;
@@ -56,23 +56,34 @@ const help = new SlashCommandBuilder()
   .setName('help')
   .setDescription('How to use Ticketbox and available commands.');
 
-/* NEW: config */
 const config = new SlashCommandBuilder()
   .setName('config')
   .setDescription('Guild configuration (admin only)')
   .addSubcommand(s =>
-    s
-      .setName('show')
-      .setDescription('Show current Ticketbox settings for this server')
+    s.setName('show').setDescription('Show current Ticketbox settings for this server')
   )
   .addSubcommand(s =>
     s
-      .setName('set_auditlog')
-      .setDescription('Set the Audit Log channel used by Ticketbox')
-      .addChannelOption(o =>
-        o.setName('channel')
-         .setDescription('Select a text channel')
-         .addChannelTypes(ChannelType.GuildText)
+      .setName('set')
+      .setDescription('Set a Ticketbox setting')
+      .addStringOption(o =>
+        o.setName('setting')
+         .setDescription('Setting key to change')
+         .addChoices(
+           { name: 'moderator_role_ids (list of roles)', value: 'moderator_role_ids' },
+           { name: 'on_duty_role_id (role)', value: 'on_duty_role_id' },
+           { name: 'tickets_category_id (category channel)', value: 'tickets_category_id' },
+           { name: 'tickets_archive_category_id (category channel)', value: 'tickets_archive_category_id' },
+           { name: 'log_channel_id (text channel)', value: 'log_channel_id' },
+           { name: 'audit_log_channel_id (text channel)', value: 'audit_log_channel_id' },
+           { name: 'fallback_ping_mod_if_no_on_duty (boolean)', value: 'fallback_ping_mod_if_no_on_duty' },
+           { name: 'transcript_enabled (boolean)', value: 'transcript_enabled' },
+         )
+         .setRequired(true)
+      )
+      .addStringOption(o =>
+        o.setName('value')
+         .setDescription('Value for the setting (IDs/mentions or true/false)')
          .setRequired(true)
       )
   );

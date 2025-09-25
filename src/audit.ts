@@ -43,37 +43,34 @@ function buildAuditEmbed(row: TicketRow): EmbedBuilder {
     .setTimestamp(new Date(row.created_at * 1000));
 }
 
-/** Ensure the per-ticket audit message exists; create it if missing, and persist its message id. */
 export async function ensureAuditEntry(guild: Guild, row: TicketRow): Promise<string | null> {
   const ch = await getAuditChannel(guild);
-  if (!ch) return null; // Not configured; silently skip
-
+  if (!ch) return null;
   if (row.audit_message_id) {
     const existing = await ch.messages.fetch(row.audit_message_id).catch(() => null);
     if (existing) return existing.id;
   }
-
   const embed = buildAuditEmbed(row);
   const msg = await ch.send({ embeds: [embed] });
   writeAuditMessageId(row.id, msg.id);
   return msg.id;
 }
 
-/** Update the audit message with a fresh embed snapshot. */
 export async function updateAuditEntry(guild: Guild, row: TicketRow): Promise<void> {
   const ch = await getAuditChannel(guild);
   if (!ch) return;
-
   const id = await ensureAuditEntry(guild, row);
   if (!id) return;
-
   const msg = await ch.messages.fetch(id).catch(() => null);
   const embed = buildAuditEmbed(row);
   if (msg) await msg.edit({ embeds: [embed] });
 }
 
-/** Generate a simple HTML transcript, attach it to the audit message, and persist the URL. */
+/** Respect guild toggle; generate+attach HTML transcript. */
 export async function attachTranscriptHTML(guild: Guild, ticket: TicketRow): Promise<string | null> {
+  const g = getGuildSettings(guild.id);
+  if (!g.transcript_enabled) return null;
+
   const ch = await getAuditChannel(guild);
   if (!ch) return null;
 
@@ -83,6 +80,7 @@ export async function attachTranscriptHTML(guild: Guild, ticket: TicketRow): Pro
   const msg = await ch.messages.fetch(id).catch(() => null);
   if (!msg) return null;
 
+  // Pull channel messages and render minimal HTML
   const ticketChannel = guild.channels.cache.get(ticket.channel_id);
   if (!ticketChannel || ticketChannel.type !== ChannelType.GuildText) return null;
   const text = ticketChannel as TextChannel;
@@ -106,22 +104,16 @@ export async function attachTranscriptHTML(guild: Guild, ticket: TicketRow): Pro
 
   const rows = collected.map(m => {
     const time = new Date(m.createdTimestamp).toISOString();
-
-    // username, not nickname
     const authorId = m.author?.id ?? '';
     const username = ((m.author?.username ?? authorId) || 'unknown');
-
     const authorAnchor = isSnowflake(authorId)
       ? `<a class="a" href="https://discord.com/users/${authorId}" title="ID: ${authorId}">${escape(username)}</a>`
       : `<span class="a">${escape(username)}</span>`;
-
     const idSuffix = isSnowflake(authorId) ? ` <span class="uid">(${authorId})</span>` : '';
-
     const content = m.content ? escape(m.content) : '';
     const attachments = m.attachments?.size
       ? `<div class="atts">Attachments: ${Array.from(m.attachments.values()).map(a => `<a href="${a.url}">${escape(a.name ?? 'file')}</a>`).join(', ')}</div>`
       : '';
-
     return `<div class="msg"><span class="t">${time}</span> ${authorAnchor}${idSuffix}<div class="c">${content}</div>${attachments}</div>`;
   }).join('\n');
 

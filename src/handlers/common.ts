@@ -5,7 +5,7 @@ export async function ensureDeferred(interaction: Interaction & { deferred?: boo
   if (!interaction.deferred && !interaction.replied) {
     try {
       // Ephemeral defer for any interaction we handle
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: 64 });
     } catch {
       // ignore if already acknowledged
     }
