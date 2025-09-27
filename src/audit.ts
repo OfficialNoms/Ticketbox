@@ -5,154 +5,218 @@
  * File Description: Audit log and transcript functions
  */
 
-import { ChannelType, EmbedBuilder, type Guild, type TextChannel, AttachmentBuilder } from 'discord.js';
+import {
+  ChannelType,
+  EmbedBuilder,
+  Guild,
+  TextChannel,
+} from 'discord.js';
+import { db } from './db';
 import { getGuildSettings } from './settings';
-import { parseParticipants, writeAuditMessageId, writeTranscriptUrl, getTicketById } from './tickets/store';
 import type { TicketRow } from './tickets/types';
+import { parseParticipants } from './tickets/store';
 
-async function getAuditChannel(guild: Guild): Promise<TextChannel | null> {
-  const id = getGuildSettings(guild.id).audit_log_channel_id?.trim();
-  if (!id) return null;
+// DB helpers
+const _getTicketById = db.prepare(`SELECT * FROM tickets WHERE id=?`);
+const _writeAuditMessageId = db.prepare(`UPDATE tickets SET audit_message_id=@mid WHERE id=@id`);
+const _writeTranscriptUrl = db.prepare(`UPDATE tickets SET transcript_url=@url WHERE id=@id`);
 
-  const cached = guild.channels.cache.get(id);
-  if (cached && cached.type === ChannelType.GuildText) return cached as TextChannel;
-
-  const fetched = await guild.channels.fetch(id).catch(() => null);
-  if (fetched && fetched.type === ChannelType.GuildText) return fetched as TextChannel;
-
-  return null;
+// Small cache for user lookups during one audit update
+class UserCache {
+  private map = new Map<string, string>();
+  constructor(private guild: Guild) {}
+  async nameFor(id: string): Promise<string> {
+    if (this.map.has(id)) return this.map.get(id)!;
+    // Prefer global username (not guild nickname)
+    const user = await this.guild.client.users.fetch(id).catch(() => null);
+    const username = user?.username ?? `Unknown#${id.slice(-4)}`;
+    this.map.set(id, username);
+    return username;
+  }
 }
 
-function uniqParticipants(row: TicketRow): string[] {
-  const set = new Set<string>([row.creator_user_id, row.target_user_id, ...parseParticipants(row)]);
+// Format as "username (<@id>)" to show both global username and a mention 
+async function fmtUser(cache: UserCache, id: string): Promise<string> {
+  const name = await cache.nameFor(id);
+  return `${name} (<@${id}>)`;
+}
+
+// Gather “everyone ever involved”
+async function collectAllParticipantIds(guild: Guild, ticket: TicketRow): Promise<string[]> {
+  const set = new Set<string>();
+
+  // Seed with opener, target, and added participants
+  set.add(ticket.creator_user_id);
+  set.add(ticket.target_user_id);
+  for (const p of parseParticipants(ticket)) set.add(p);
+
+  // Add anyone who posted in the channel (best-effort; tickets are usually short)
+  const ch = guild.channels.cache.get(ticket.channel_id) ?? await guild.channels.fetch(ticket.channel_id).catch(() => null);
+  if (ch && ch.type === ChannelType.GuildText) {
+    const text = ch as TextChannel;
+    let before: string | undefined;
+    // Walk back up to ~4000 messages to be safe
+    for (;;) {
+      const batch = await text.messages.fetch({ limit: 100, ...(before ? { before } : {}) }).catch(() => null);
+      if (!batch || batch.size === 0) break;
+      for (const m of batch.values()) {
+        set.add(m.author.id);
+      }
+      const last = batch.last();
+      if (!last) break;
+      before = last.id;
+      // safety guard
+      if (set.size > 4000) break;
+    }
+  }
+
   return Array.from(set);
 }
 
-function buildAuditEmbed(row: TicketRow): EmbedBuilder {
-  const participants = uniqParticipants(row).map(id => `<@${id}>`).join(', ') || '—';
-  const fields: { name: string; value: string; inline?: boolean }[] = [
-    { name: 'Status', value: `\`${row.state}\``, inline: true },
-    { name: 'Opened by', value: `<@${row.creator_user_id}>`, inline: true },
-    { name: 'Target user', value: `<@${row.target_user_id}>`, inline: true },
-    ...(row.closed_by_user_id ? [{ name: 'Closed by', value: `<@${row.closed_by_user_id}>`, inline: true }] : []),
-    ...(row.archived_by_user_id ? [{ name: 'Archived by', value: `<@${row.archived_by_user_id}>`, inline: true }] : []),
-    ...(row.subject ? [{ name: 'Subject', value: row.subject, inline: false }] : []),
-    { name: 'Participants', value: participants, inline: false },
-  ];
-  if (row.transcript_url) {
-    fields.push({ name: 'Transcript', value: row.transcript_url, inline: false });
+// Build the audit embed from current ticket row (optionally with full participants)
+async function buildAuditEmbed(guild: Guild, ticket: TicketRow, includeAllParticipants: boolean): Promise<EmbedBuilder> {
+  const cache = new UserCache(guild);
+
+  const title = `Ticket ${ticket.id}`;
+  const chMention = `<#${ticket.channel_id}>`;
+
+  // Participants: either the minimal known set (for live tickets) or the full union (for archive)
+  let participantIds: string[] = [];
+  if (includeAllParticipants) {
+    participantIds = await collectAllParticipantIds(guild, ticket);
+  } else {
+    const seeded = new Set<string>([
+      ticket.creator_user_id,
+      ticket.target_user_id,
+      ...parseParticipants(ticket),
+    ]);
+    participantIds = Array.from(seeded);
   }
 
-  return new EmbedBuilder()
-    .setTitle(`🧭 Ticket Audit — ${row.id}`)
-    .setDescription(`Channel: <#${row.channel_id}>`)
-    .addFields(fields)
-    .setTimestamp(new Date(row.created_at * 1000));
-}
-
-export async function ensureAuditEntry(guild: Guild, row: TicketRow): Promise<string | null> {
-  const ch = await getAuditChannel(guild);
-  if (!ch) return null;
-  if (row.audit_message_id) {
-    const existing = await ch.messages.fetch(row.audit_message_id).catch(() => null);
-    if (existing) return existing.id;
+  // Render participants — keep under embed field limits
+  const rendered: string[] = [];
+  for (const id of participantIds) {
+    rendered.push(await fmtUser(cache, id));
+    if (rendered.join('\n').length > 900) { // stay under 1024 hard limit
+      rendered.push('…');
+      break;
+    }
   }
-  const embed = buildAuditEmbed(row);
-  const msg = await ch.send({ embeds: [embed] });
-  writeAuditMessageId(row.id, msg.id);
-  return msg.id;
+
+  const e = new EmbedBuilder()
+    .setTitle('🧾 Ticket Audit')
+    .addFields(
+      { name: 'Ticket', value: `${chMention}`, inline: true },
+      { name: 'Status', value: `\`${ticket.state}\``, inline: true },
+      { name: 'Subject', value: ticket.subject ? ticket.subject : '—', inline: true },
+      { name: 'Opened by', value: await fmtUser(cache, ticket.creator_user_id), inline: true },
+      { name: 'Target user', value: await fmtUser(cache, ticket.target_user_id), inline: true },
+      { name: 'Participants (ever involved)', value: rendered.length ? rendered.join('\n') : '—', inline: false },
+    )
+    .setTimestamp(new Date());
+
+  if (ticket.transcript_url) {
+    e.addFields({ name: 'Transcript', value: `[HTML transcript](${ticket.transcript_url})`, inline: false });
+  }
+
+  if (ticket.closed_at) {
+    const closedBy = (ticket as any).closed_by_user_id as string | null | undefined;
+    if (closedBy) {
+      e.addFields({ name: 'Closed by', value: await fmtUser(cache, closedBy), inline: true });
+    }
+  }
+  if (ticket.archived_at) {
+    const archivedBy = (ticket as any).archived_by_user_id as string | null | undefined;
+    if (archivedBy) {
+      e.addFields({ name: 'Archived by', value: await fmtUser(cache, archivedBy), inline: true });
+    }
+  }
+
+  return e;
 }
 
-export async function updateAuditEntry(guild: Guild, row: TicketRow): Promise<void> {
-  const ch = await getAuditChannel(guild);
-  if (!ch) return;
-  const id = await ensureAuditEntry(guild, row);
-  if (!id) return;
-  const msg = await ch.messages.fetch(id).catch(() => null);
-  const embed = buildAuditEmbed(row);
-  if (msg) await msg.edit({ embeds: [embed] });
-}
-
-// Respect guild toggle; generate+attach HTML transcript.
-export async function attachTranscriptHTML(guild: Guild, ticket: TicketRow): Promise<string | null> {
+// Ensure there is a one-message-per-ticket audit entry 
+export async function ensureAuditEntry(guild: Guild, ticket: TicketRow) {
   const g = getGuildSettings(guild.id);
-  if (!g.transcript_enabled) return null;
+  if (!g.audit_log_channel_id) return; // not configured → nothing to do
 
-  const ch = await getAuditChannel(guild);
-  if (!ch) return null;
+  // Already have a message?
+  const existing = (_getTicketById.get(ticket.id) as any) || ticket;
+  const auditMessageId = existing.audit_message_id as string | null | undefined;
+  const ch = guild.channels.cache.get(g.audit_log_channel_id) ?? await guild.channels.fetch(g.audit_log_channel_id).catch(() => null);
+  if (!ch || ch.type !== ChannelType.GuildText) return;
 
-  const id = await ensureAuditEntry(guild, ticket);
-  if (!id) return null;
+  const text = ch as TextChannel;
 
-  const msg = await ch.messages.fetch(id).catch(() => null);
-  if (!msg) return null;
-
-  // Pull channel messages and render minimal HTML
-  const ticketChannel = guild.channels.cache.get(ticket.channel_id);
-  if (!ticketChannel || ticketChannel.type !== ChannelType.GuildText) return null;
-  const text = ticketChannel as TextChannel;
-
-  // Collect up to ~500 messages, oldest → newest
-  const collected: any[] = [];
-  let beforeId: string | undefined = undefined;
-  for (let i = 0; i < 5; i++) {
-    const batch = await text.messages.fetch({ limit: 100, before: beforeId }).catch(() => null);
-    if (!batch || batch.size === 0) break;
-    const msgs = Array.from(batch.values());
-    collected.push(...msgs);
-    const oldest = msgs.reduce((a, b) => (a.createdTimestamp < b.createdTimestamp ? a : b));
-    beforeId = oldest.id;
-    if (batch.size < 100) break;
+  if (auditMessageId) {
+    // Make sure it still exists; if not, we’ll recreate
+    const ok = await text.messages.fetch(auditMessageId).then(() => true).catch(() => false);
+    if (ok) return;
   }
-  collected.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
 
-  const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const isSnowflake = (s: string | undefined) => !!s && /^\d+$/.test(s);
+  // For live tickets, don’t pay the cost of full history; minimal set is fine here.
+  const embed = await buildAuditEmbed(guild, existing as TicketRow, /*includeAllParticipants*/ false);
+  const msg = await text.send({ embeds: [embed] }).catch(() => null);
+  if (!msg) return;
 
-  const rows = collected.map(m => {
-    const time = new Date(m.createdTimestamp).toISOString();
-    const authorId = m.author?.id ?? '';
-    const username = ((m.author?.username ?? authorId) || 'unknown');
-    const authorAnchor = isSnowflake(authorId)
-      ? `<a class="a" href="https://discord.com/users/${authorId}" title="ID: ${authorId}">${escape(username)}</a>`
-      : `<span class="a">${escape(username)}</span>`;
-    const idSuffix = isSnowflake(authorId) ? ` <span class="uid">(${authorId})</span>` : '';
-    const content = m.content ? escape(m.content) : '';
-    const attachments = m.attachments?.size
-      ? `<div class="atts">Attachments: ${Array.from(m.attachments.values()).map(a => `<a href="${a.url}">${escape(a.name ?? 'file')}</a>`).join(', ')}</div>`
-      : '';
-    return `<div class="msg"><span class="t">${time}</span> ${authorAnchor}${idSuffix}<div class="c">${content}</div>${attachments}</div>`;
-  }).join('\n');
+  _writeAuditMessageId.run({ id: ticket.id, mid: msg.id });
+}
 
-  const html = `<!doctype html>
-<html lang="en">
-<meta charset="utf-8" />
-<title>Ticket ${ticket.id} Transcript</title>
-<style>
-body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;background:#111;color:#eee;margin:0;padding:24px;}
-h1{margin-top:0;font-size:20px;}
-.msg{padding:8px 0;border-bottom:1px solid #222;}
-.t{color:#9aa0a6;margin-right:8px;font-size:12px}
-.a{color:#8ab4f8;text-decoration:none}
-.a:hover{text-decoration:underline}
-.uid{color:#9aa0a6;font-size:12px;margin-left:4px}
-.c{white-space:pre-wrap;margin-top:4px}
-.atts a{color:#8ab4f8}
-.meta{color:#9aa0a6;margin-bottom:12px}
-</style>
-<h1>Ticket ${escape(ticket.id)} Transcript</h1>
-<div class="meta">Channel: #${escape((text as any).name ?? '')} • Guild: ${escape(guild.name)}</div>
-${rows}
-</html>`;
+// Update/edit the audit entry. When archived, expand participants to “everyone ever involved”. 
+export async function updateAuditEntry(guild: Guild, ticket: TicketRow) {
+  const g = getGuildSettings(guild.id);
+  if (!g.audit_log_channel_id) return;
 
-  const attachment = new AttachmentBuilder(Buffer.from(html, 'utf-8'), { name: `ticket-${ticket.id}.html` });
+  const row = (_getTicketById.get(ticket.id) as any) || ticket;
+  const auditMessageId = row.audit_message_id as string | null | undefined;
+  const ch = guild.channels.cache.get(g.audit_log_channel_id) ?? await guild.channels.fetch(g.audit_log_channel_id).catch(() => null);
+  if (!ch || ch.type !== ChannelType.GuildText) return;
 
-  const embed = buildAuditEmbed(ticket);
-  const edited = await msg.edit({ embeds: [embed], files: [attachment] }).catch(() => null);
-  const url = edited?.attachments?.first()?.url ?? null;
+  const text = ch as TextChannel;
 
-  writeTranscriptUrl(ticket.id, url);
-  const updated = getTicketById(ticket.id);
-  if (updated) await updateAuditEntry(guild, updated);
-  return url;
+  // If missing, create it first
+  if (!auditMessageId) {
+    await ensureAuditEntry(guild, row as TicketRow);
+  }
+
+  const msgId = (row.audit_message_id as string | null | undefined);
+  if (!msgId) return; // still missing; bail
+
+  // Archived → compute the full union; otherwise use the light set
+  const includeAll = (row.state === 'ARCHIVED');
+  const embed = await buildAuditEmbed(guild, row as TicketRow, includeAll);
+
+  const msg = await text.messages.fetch(msgId).catch(() => null);
+  if (msg) {
+    await msg.edit({ embeds: [embed] }).catch(() => {});
+  }
+}
+
+// Attach the generated HTML transcript (path/url provided elsewhere) to the audit entry
+export async function attachTranscriptHTML(guild: Guild, ticket: TicketRow) {
+  const g = getGuildSettings(guild.id);
+  if (!g.audit_log_channel_id || !ticket.transcript_url) return;
+
+  const row = (_getTicketById.get(ticket.id) as any) || ticket;
+  const ch = guild.channels.cache.get(g.audit_log_channel_id) ?? await guild.channels.fetch(g.audit_log_channel_id).catch(() => null);
+  if (!ch || ch.type !== ChannelType.GuildText) return;
+
+  const text = ch as TextChannel;
+
+  // Ensure there is a message
+  if (!row.audit_message_id) {
+    await ensureAuditEntry(guild, row as TicketRow);
+  }
+  const msgId = (row.audit_message_id as string | null | undefined);
+  if (!msgId) return;
+
+  // Just re-render the embed; it already prints the transcript link if present.
+  const embed = await buildAuditEmbed(guild, row as TicketRow, row.state === 'ARCHIVED');
+  const msg = await text.messages.fetch(msgId).catch(() => null);
+  if (msg) await msg.edit({ embeds: [embed] }).catch(() => {});
+}
+
+// Optional helper if you add HTML generation elsewhere to set the URL on the row 
+export function setTranscriptUrl(ticketId: string, url: string | null) {
+  _writeTranscriptUrl.run({ id: ticketId, url });
 }
