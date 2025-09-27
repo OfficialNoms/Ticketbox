@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/tickets/create.ts
+ * Created by github.com/officialnoms
+ * File Description: Functions to create new tickets
+ */
+
 import { ChannelType, PermissionFlagsBits, type Guild, type OverwriteResolvable, type TextChannel } from 'discord.js';
 import { loadConfig } from '../config';
 import { now } from '../db';

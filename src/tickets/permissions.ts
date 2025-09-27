@@ -1,10 +1,17 @@
+/*
+ * Ticketbox
+ * File: src/tickets/permissions.ts
+ * Created by github.com/officialnoms
+ * File Description: Permission management functions
+ */
+
 import type { GuildMember, TextChannel, OverwriteResolvable } from 'discord.js';
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
 import { loadConfig } from '../config';
 
 const cfg = loadConfig();
 
-/** Make the channel read-only for everyone, including all moderator roles. */
+// Make the channel read-only for everyone, including all moderator roles.
 export async function setChannelReadOnlyAll(channel: TextChannel) {
   await channel.permissionOverwrites.edit(channel.guild.roles.everyone, { SendMessages: false });
   for (const rid of cfg.moderatorRoleIds) {
@@ -12,7 +19,7 @@ export async function setChannelReadOnlyAll(channel: TextChannel) {
   }
 }
 
-/** Re-open: user + mod roles can send again. */
+// Re-open: user + mod roles can send again.
 export async function setChannelOpenFor(openerId: string, channel: TextChannel) {
   await channel.permissionOverwrites.edit(openerId, { ViewChannel: true, SendMessages: true });
   for (const rid of cfg.moderatorRoleIds) {
@@ -28,7 +35,7 @@ export async function unlockUserSendPermissions(channel: TextChannel, userId: st
   await channel.permissionOverwrites.edit(userId, { ViewChannel: true, SendMessages: true });
 }
 
-/** Try to move to archive category if configured & valid. Silently no-op if not. */
+// Try to move to archive category if configured & valid. Silently no-op if not.
 export async function moveToArchive(channel: TextChannel) {
   const id = cfg.ticketsArchiveCategoryId;
   if (!id) return;
@@ -41,7 +48,7 @@ export function memberIsModerator(member: GuildMember): boolean {
   return cfg.moderatorRoleIds.some(rid => member.roles.cache.has(rid)) || member.permissions.has('Administrator');
 }
 
-/** Utility to build staff overwrites for a newly created channel. */
+// Utility to build staff overwrites for a newly created channel.
 export function buildStaffOverwrites(): OverwriteResolvable[] {
   return cfg.moderatorRoleIds.map((rid): OverwriteResolvable => ({
     id: rid,

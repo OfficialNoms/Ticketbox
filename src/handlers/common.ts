@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/handlers/common.ts
+ * Created by github.com/officialnoms
+ * File Description: Common interaction handlers
+ */
+
 import type { Interaction } from 'discord.js';
 
 export async function ensureDeferred(interaction: Interaction & { deferred?: boolean; replied?: boolean }) {

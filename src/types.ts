@@ -16,7 +16,7 @@ export type TicketRow = {
   transcript_url: string | null;
   header_message_id: string | null;
 
-  /* NEW: Audit fields */
+// NEW: Audit fields
   audit_message_id: string | null;
   closed_by_user_id: string | null;
   archived_by_user_id: string | null;

@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/commands/config.ts 
+ * Created by github.com/officialnoms
+ * File Description: /config command handler
+ */
+
 import type { Interaction } from 'discord.js';
 import { PermissionsBitField as PBF, EmbedBuilder } from 'discord.js';
 import { getGuildSettings, setGuildSetting } from '../settings';

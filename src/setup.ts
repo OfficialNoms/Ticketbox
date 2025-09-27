@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/setup.ts
+ * Created by github.com/officialnoms
+ * File Description: Guild initial setup functions
+ */
+
 import {
   ChannelType,
   EmbedBuilder,
@@ -10,7 +17,7 @@ import { loadConfig } from './config';
 
 const fileCfg = loadConfig();
 
-/** Build the reusable setup embed content. */
+// Build the reusable setup embed content.
 export function createSetupEmbed(): EmbedBuilder {
   return new EmbedBuilder()
     .setTitle('👋 Ticketbox — First-time setup')
@@ -50,7 +57,7 @@ export function createSetupEmbed(): EmbedBuilder {
     .setTimestamp(new Date());
 }
 
-/**
+/*
  * Create an initial guild_config row if one does not exist.
  * Returns true if we created a new row (i.e., first-time setup), false otherwise.
  */
@@ -75,7 +82,7 @@ async function ensureGuildConfig(guild: Guild): Promise<boolean> {
   return true;
 }
 
-/** Exported so /setup can reuse the channel-picking logic if needed. */
+// Exported so /setup can reuse the channel-picking logic if needed.
 export async function pickSetupChannel(guild: Guild): Promise<TextChannel | null> {
   const me = guild.members.me ?? (await guild.members.fetchMe().catch(() => null));
   if (!me) return null;
@@ -96,19 +103,19 @@ export async function pickSetupChannel(guild: Guild): Promise<TextChannel | null
   return null;
 }
 
-/** Post the setup embed to a specific channel. */
+// Post the setup embed to a specific channel.
 export async function sendSetupEmbedToChannel(channel: TextChannel): Promise<void> {
   await channel.send({ embeds: [createSetupEmbed()] }).catch(() => {});
 }
 
-/** Post a setup embed to the best-available channel. */
+// Post a setup embed to the best-available channel.
 async function postSetupMessage(guild: Guild): Promise<void> {
   const ch = await pickSetupChannel(guild);
   if (!ch) return;
   await sendSetupEmbedToChannel(ch);
 }
 
-/** Public entry: ensure config exists, and post a one-time setup message when we just created it. */
+// Public entry: ensure config exists, and post a one-time setup message when we just created it.
 export async function bootstrapGuild(guild: Guild): Promise<void> {
   const created = await ensureGuildConfig(guild);
   if (created) {

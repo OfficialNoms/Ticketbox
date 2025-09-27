@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/tickets/types.ts
+ * Created by github.com/officialnoms
+ * File Description: Public types for tickets
+ */
+
 export type TicketState = 'OPEN' | 'RESOLVED_PENDING_REVIEW' | 'CLOSED' | 'ARCHIVED';
 
 export type TicketRow = {

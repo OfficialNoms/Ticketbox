@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/index.ts
+ * Created by github.com/officialnoms
+ * File Description: Main entry point and bot initialization
+ */
+
 import 'dotenv/config';
 import {
   Client,

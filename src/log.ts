@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/log.ts
+ * Created by github.com/officialnoms
+ * File Description: Logging functions
+ */
+
 import { EmbedBuilder, Guild, TextChannel, ChannelType } from 'discord.js';
 import { getGuildSettings } from './settings';
 

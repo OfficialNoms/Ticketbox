@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/duty.ts
+ * Created by github.com/officialnoms
+ * File Description: On-Duty management functions
+ */
+
 import { Guild, GuildMember } from 'discord.js';
 import { db, now } from './db.js';
 import { loadConfig } from './config.js';

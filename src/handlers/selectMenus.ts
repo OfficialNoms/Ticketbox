@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/handlers/selectMenus.ts
+ * Created by github.com/officialnoms
+ * File Description: User select menu interaction handlers
+ */
+
 import type { TextChannel, Interaction } from 'discord.js';
 import { getTicketByChannel, addParticipant, removeParticipant, memberIsModerator } from '../tickets';
 import { logAction } from '../log';

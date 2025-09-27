@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/commands/ticket.ts
+ * Created by github.com/officialnoms
+ * File Description: /ticket command handler
+ */
+
 import type { Interaction, TextChannel } from 'discord.js';
 import { EmbedBuilder, ChannelType } from 'discord.js';
 import {

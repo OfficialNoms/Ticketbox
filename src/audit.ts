@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/audit.ts
+ * Created by github.com/officialnoms
+ * File Description: Audit log and transcript functions
+ */
+
 import { ChannelType, EmbedBuilder, type Guild, type TextChannel, AttachmentBuilder } from 'discord.js';
 import { getGuildSettings } from './settings';
 import { parseParticipants, writeAuditMessageId, writeTranscriptUrl, getTicketById } from './tickets/store';
@@ -66,7 +73,7 @@ export async function updateAuditEntry(guild: Guild, row: TicketRow): Promise<vo
   if (msg) await msg.edit({ embeds: [embed] });
 }
 
-/** Respect guild toggle; generate+attach HTML transcript. */
+// Respect guild toggle; generate+attach HTML transcript.
 export async function attachTranscriptHTML(guild: Guild, ticket: TicketRow): Promise<string | null> {
   const g = getGuildSettings(guild.id);
   if (!g.transcript_enabled) return null;

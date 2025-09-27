@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/commands/defs.ts
+ * Created by github.com/officialnoms
+ * File Description: Command definitions and builders
+ */
+
 import { SlashCommandBuilder } from 'discord.js';
 
 export function getCommandBuilders() {

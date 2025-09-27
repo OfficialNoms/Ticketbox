@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/tickets/participants.ts
+ * Created by github.com/officialnoms
+ * File Description: Participant management functions
+ */
+
 import type { TextChannel } from 'discord.js';
 import { PermissionsBitField } from 'discord.js';
 import { loadConfig } from '../config';

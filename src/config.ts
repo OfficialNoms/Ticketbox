@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/config.ts
+ * Created by github.com/officialnoms
+ * File Description: Configuration loading and validation
+ */
+
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AppConfig } from './types';

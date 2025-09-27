@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/commands/help.ts
+ * Created by github.com/officialnoms
+ * File Description: /help command handler
+ */
+
 import type { Interaction } from 'discord.js';
 import { EmbedBuilder } from 'discord.js';
 

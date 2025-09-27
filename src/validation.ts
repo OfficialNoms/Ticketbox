@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/validation.ts
+ * Created by github.com/officialnoms
+ * File Description: Guild configuration validation and health check
+ */
+
 import {
   ChannelType,
   EmbedBuilder,
@@ -8,7 +15,7 @@ import {
 } from 'discord.js';
 import { getGuildSettings } from './settings';
 
-/** One line in the validation report */
+// One line in the validation report 
 type Status = 'pass' | 'warn' | 'fail';
 type Check = { name: string; status: Status; detail: string; fix?: string };
 
@@ -41,9 +48,7 @@ export async function validateGuild(guild: Guild) {
     return false;
   };
 
-  // ───────────────────────────────
   // Audit Log channel
-  // ───────────────────────────────
   if (!g.audit_log_channel_id) {
     checks.push(fail('Audit log channel is not set.', 'Run: /config set setting:audit_log_channel_id value:#channel'));
   } else {
@@ -61,9 +66,7 @@ export async function validateGuild(guild: Guild) {
     }
   }
 
-  // ───────────────────────────────
   // Ticket Log channel (optional)
-  // ───────────────────────────────
   if (!g.log_channel_id) {
     checks.push(warn('Log channel is not set (optional).', 'If you want event logs, set log_channel_id to a text channel.'));
   } else {
@@ -81,9 +84,7 @@ export async function validateGuild(guild: Guild) {
     }
   }
 
-  // ───────────────────────────────
   // Categories
-  // ───────────────────────────────
   const ticketsCat = g.tickets_category_id ? guild.channels.cache.get(g.tickets_category_id) : null;
   const archiveCat = g.tickets_archive_category_id ? guild.channels.cache.get(g.tickets_archive_category_id) : null;
 
@@ -109,9 +110,7 @@ export async function validateGuild(guild: Guild) {
     checks.push(ok('Archive category OK.'));
   }
 
-  // ───────────────────────────────
   // Roles
-  // ───────────────────────────────
   if (!g.moderator_role_ids || g.moderator_role_ids.length === 0) {
     checks.push(warn('No moderator roles configured.', 'Recommended: set moderator_role_ids to your staff roles.'));
   } else {
@@ -133,9 +132,7 @@ export async function validateGuild(guild: Guild) {
     checks.push(warn('On-duty role not set (optional).', 'If you use on-duty, set on_duty_role_id to a role.'));
   }
 
-  // ───────────────────────────────
   // Transcript toggle
-  // ───────────────────────────────
   checks.push(ok(`Transcripts are ${g.transcript_enabled ? 'ENABLED' : 'DISABLED'} (can be toggled with /config set).`));
 
   return checks;

@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/commands/duty.ts
+ * Created by github.com/officialnoms
+ * File Description: /duty command handler
+ */
+
 import type { Interaction } from 'discord.js';
 import { listOnDutyMentions, setDuty, syncOnDutyRole } from '../duty';
 

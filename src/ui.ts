@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/ui.ts
+ * Created by github.com/officialnoms
+ * File Description: UI components and embeds
+ */
+
 import {
   ActionRowBuilder,
   ButtonBuilder,

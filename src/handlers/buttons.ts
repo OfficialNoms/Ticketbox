@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/handlers/buttons.ts
+ * Created by github.com/officialnoms
+ * File Description: Button interaction handlers
+ */
+
 import type { Interaction, TextChannel, UserSelectMenuBuilder } from 'discord.js';
 import { ActionRowBuilder, UserSelectMenuBuilder as USMB } from 'discord.js';
 import {

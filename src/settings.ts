@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/settings.ts
+ * Created by github.com/officialnoms
+ * File Description: Guild settings management
+ */
+
 import type { Guild } from 'discord.js';
 import { now, _getGuildConfig, _upsertGuildConfig } from './db';
 import { loadConfig } from './config';
@@ -89,7 +96,7 @@ export function getGuildSettings(guildId: string): GuildSettings {
   };
 }
 
-/** Generic setter for a single guild setting. */
+// Generic setter for a single guild setting.
 export function setGuildSetting(
   guildId: string,
   key:
@@ -148,7 +155,7 @@ export function setGuildSetting(
   _upsertGuildConfig.run(payload);
 }
 
-/** Back-compat helper (used earlier) */
+// Back-compat helper (used earlier)
 export function setAuditLogChannel(guildId: string, channelId: string | null) {
   setGuildSetting(guildId, 'audit_log_channel_id', channelId);
 }

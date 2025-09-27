@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/tickets/index.ts
+ * Created by github.com/officialnoms
+ * File Description: Main export file for ticket-related functions and types
+ */
+
 // Re-export public types
 export type { TicketState, TicketRow } from './types';
 

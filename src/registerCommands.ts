@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/registerCommands.ts
+ * Created by github.com/officialnoms
+ * File Description: Manual script to register slash commands
+ */
+
 import 'dotenv/config';
 import { REST, Routes } from 'discord.js';
 import { getCommandsJSON } from './commands/defs';

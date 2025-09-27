@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/tickets/store.ts
+ * Created by github.com/officialnoms
+ * File Description: Store functions for ticket data
+ */
+
 import { db, now } from '../db';
 import type { TicketRow, TicketState } from './types';
 

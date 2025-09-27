@@ -1,3 +1,10 @@
+/*
+ * Ticketbox
+ * File: src/commands/setup.ts
+ * Created by github.com/officialnoms
+ * File Description: /setup command handler
+ */
+
 import type { Interaction, TextChannel } from 'discord.js';
 import { ChannelType, PermissionsBitField as PBF } from 'discord.js';
 import { createSetupEmbed, pickSetupChannel, sendSetupEmbedToChannel } from '../setup';
