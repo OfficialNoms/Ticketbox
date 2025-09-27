@@ -68,6 +68,11 @@ export function getCommandBuilders() {
         .addStringOption(o =>
           o.setName('value').setDescription('Value for the setting (IDs/mentions or true/false)').setRequired(true)
         )
+    )
+    .addSubcommand(s =>
+      s
+        .setName('validate')
+        .setDescription('Run a Ticketbox configuration health check for this server')
     );
 
   const setup = new SlashCommandBuilder()

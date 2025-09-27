@@ -1,6 +1,7 @@
 import type { Interaction } from 'discord.js';
 import { PermissionsBitField as PBF, EmbedBuilder } from 'discord.js';
 import { getGuildSettings, setGuildSetting } from '../settings';
+import { validateGuild, renderValidationEmbed } from '../validation';
 
 const SETTING_CHOICES = [
   'moderator_role_ids',
@@ -99,7 +100,6 @@ export async function handleConfigCommand(interaction: Interaction) {
           await interaction.editReply({ content: `✅ Cleared **${key}**.` });
           return true;
         }
-        // Optional: type check could be added here; we accept any channel ID string.
         setGuildSetting(interaction.guild.id, key, id);
         await interaction.editReply({ content: `✅ Set **${key}** to <#${id}>` });
         return true;
@@ -131,6 +131,17 @@ export async function handleConfigCommand(interaction: Interaction) {
       await interaction.editReply({ content: 'Unsupported setting.' });
     } catch (err: any) {
       await interaction.editReply({ content: `Failed to set: ${err.message ?? 'unknown error'}` });
+    }
+    return true;
+  }
+
+  if (sub === 'validate') {
+    try {
+      const checks = await validateGuild(interaction.guild);
+      const embed = renderValidationEmbed(interaction.guild, checks);
+      await interaction.editReply({ embeds: [embed] });
+    } catch (err: any) {
+      await interaction.editReply({ content: `Validation failed: ${err.message ?? 'unknown error'}` });
     }
     return true;
   }
