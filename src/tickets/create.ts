@@ -7,7 +7,20 @@ import { buildStaffOverwrites } from './permissions';
 
 const cfg = loadConfig();
 
-export async function createUserTicket(guild: Guild, creatorId: string, subject?: string): Promise<TextChannel> {
+function resolveParentId(guild: Guild, explicitParentId?: string | null): string | null {
+  const parentId = typeof explicitParentId === 'string' ? explicitParentId : (cfg.ticketsCategoryId || null);
+  if (!parentId) return null;
+  const ch = guild.channels.cache.get(parentId);
+  if (ch && ch.type === ChannelType.GuildCategory) return parentId;
+  return null; // invalid or missing → create at guild root
+}
+
+export async function createUserTicket(
+  guild: Guild,
+  creatorId: string,
+  subject?: string,
+  opts?: { parentCategoryId?: string | null }
+): Promise<TextChannel> {
   const id = shortId();
   const member = await guild.members.fetch(creatorId);
 
@@ -45,10 +58,12 @@ export async function createUserTicket(guild: Guild, creatorId: string, subject?
     },
   ];
 
+  const parent = resolveParentId(guild, opts?.parentCategoryId ?? null);
+
   const channel = await guild.channels.create({
     name: channelName,
     type: ChannelType.GuildText,
-    parent: cfg.ticketsCategoryId || null,
+    parent: parent ?? null,
     permissionOverwrites: overwrites,
   });
 
@@ -77,7 +92,8 @@ export async function createTicketForTarget(
   guild: Guild,
   creatorId: string,     // mod creating
   targetUserId: string,  // user ticket is for
-  subject?: string
+  subject?: string,
+  opts?: { parentCategoryId?: string | null }
 ): Promise<TextChannel> {
   const id = shortId();
   const target = await guild.members.fetch(targetUserId);
@@ -116,10 +132,12 @@ export async function createTicketForTarget(
     },
   ];
 
+  const parent = resolveParentId(guild, opts?.parentCategoryId ?? null);
+
   const channel = await guild.channels.create({
     name: channelName,
     type: ChannelType.GuildText,
-    parent: cfg.ticketsCategoryId || null,
+    parent: parent ?? null,
     permissionOverwrites: overwrites,
   });
 

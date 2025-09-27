@@ -1,5 +1,5 @@
 import type { Interaction, TextChannel } from 'discord.js';
-import { EmbedBuilder } from 'discord.js';
+import { EmbedBuilder, ChannelType } from 'discord.js';
 import {
   createUserTicket,
   createTicketForTarget,
@@ -11,9 +11,29 @@ import { buildHeaderEmbed, buildUserRow, buildModRow, buildParticipantRow } from
 import { logAction } from '../log';
 import { loadConfig } from '../config';
 import { memberIsModerator } from '../tickets';
+import { getGuildSettings } from '../settings';
 import { ensureAuditEntry } from '../audit';
 
 const cfg = loadConfig();
+
+function preflightTicketCreate(interactionGuild: any) {
+  const g = getGuildSettings(interactionGuild.id);
+  const warnings: string[] = [];
+
+  let parentId: string | null = null;
+  if (g.tickets_category_id) {
+    const cat = interactionGuild.channels.cache.get(g.tickets_category_id);
+    if (cat && cat.type === ChannelType.GuildCategory) {
+      parentId = g.tickets_category_id;
+    } else {
+      warnings.push('⚠️ Tickets category is not set correctly. Created the ticket at the server root. Run `/config validate` to fix.');
+    }
+  } else {
+    warnings.push('⚠️ Tickets category is not configured. Created the ticket at the server root. Run `/config validate` to fix.');
+  }
+
+  return { parentId, warnings };
+}
 
 export async function handleTicketCommand(interaction: Interaction) {
   if (!interaction.isChatInputCommand() || interaction.commandName !== 'ticket') return false;
@@ -27,16 +47,26 @@ export async function handleTicketCommand(interaction: Interaction) {
   if (sub === 'open') {
     const subject = interaction.options.getString('subject') ?? null;
     await interaction.deferReply({ flags: 64 });
+
+    const { parentId, warnings } = preflightTicketCreate(interaction.guild);
+
     try {
-      const channel = await createUserTicket(interaction.guild, interaction.user.id, subject ?? undefined);
+      const channel = await createUserTicket(
+        interaction.guild,
+        interaction.user.id,
+        subject ?? undefined,
+        { parentCategoryId: parentId }
+      );
+
       const msg = await sendHeader(channel as TextChannel, interaction.user.id, subject);
       const ticket = getTicketByChannel(channel.id)!;
       saveHeaderMessageId(ticket.id, msg.id);
 
-      // NEW: create (or re-link) the audit entry message
+      // 🔎 ensure one-message audit entry exists now
       await ensureAuditEntry(interaction.guild, ticket);
 
-      await interaction.editReply({ content: `Your ticket is ready: ${channel}` });
+      const extra = warnings.length ? `\n${warnings.join('\n')}` : '';
+      await interaction.editReply({ content: `Your ticket is ready: ${channel}${extra}` });
 
       await logAction(interaction.guild, 'OPEN', [
         { name: 'Ticket', value: `<#${(channel as TextChannel).id}>` },
@@ -60,8 +90,17 @@ export async function handleTicketCommand(interaction: Interaction) {
     const subject = interaction.options.getString('subject') ?? null;
 
     await interaction.deferReply({ flags: 64 });
+
+    const { parentId, warnings } = preflightTicketCreate(interaction.guild);
+
     try {
-      const channel = await createTicketForTarget(interaction.guild, interaction.user.id, target.id, subject ?? undefined);
+      const channel = await createTicketForTarget(
+        interaction.guild,
+        interaction.user.id,
+        target.id,
+        subject ?? undefined,
+        { parentCategoryId: parentId }
+      );
 
       const embed = new EmbedBuilder()
         .setTitle('🎫 Ticket Created')
@@ -92,10 +131,11 @@ export async function handleTicketCommand(interaction: Interaction) {
       const t = getTicketByChannel(channel.id)!;
       saveHeaderMessageId(t.id, msg.id);
 
-      // NEW: create (or re-link) the audit entry message
+      // 🔎 ensure one-message audit entry exists now
       await ensureAuditEntry(interaction.guild, t);
 
-      await interaction.editReply({ content: `Opened ticket for ${target} → ${channel}` });
+      const extra = warnings.length ? `\n${warnings.join('\n')}` : '';
+      await interaction.editReply({ content: `Opened ticket for ${target} → ${channel}${extra}` });
 
       await logAction(interaction.guild, 'OPEN_FOR', [
         { name: 'Ticket', value: `<#${(channel as TextChannel).id}>` },

@@ -40,9 +40,7 @@ export async function handleButton(interaction: Interaction) {
 
   const isArchived = ticket.state === 'ARCHIVED';
 
-  // ─────────────────────────────────────────────────────────────────────────────
   // STAFF: open user picker to add/remove participants
-  // ─────────────────────────────────────────────────────────────────────────────
   if (interaction.customId === 'ticket:mod_add' || interaction.customId === 'ticket:mod_remove') {
     if (!member || !memberIsModerator(member)) {
       await interaction.editReply({ content: 'Moderator only.' });
@@ -69,9 +67,7 @@ export async function handleButton(interaction: Interaction) {
     return true;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // USER: mark resolved (moves to RESOLVED_PENDING_REVIEW)
-  // ─────────────────────────────────────────────────────────────────────────────
+  // USER: resolved
   if (interaction.customId === 'ticket:user_resolve') {
     const clicker = interaction.user.id;
     const allowed = clicker === ticket.creator_user_id || clicker === ticket.target_user_id;
@@ -104,9 +100,7 @@ export async function handleButton(interaction: Interaction) {
     return true;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // USER: request reopen (posts a ping)
-  // ─────────────────────────────────────────────────────────────────────────────
+  // USER: not resolved (request reopen)
   if (interaction.customId === 'ticket:user_not_resolved') {
     const clicker = interaction.user.id;
     const allowed = clicker === ticket.creator_user_id || clicker === ticket.target_user_id;
@@ -144,9 +138,7 @@ export async function handleButton(interaction: Interaction) {
     return true;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // STAFF: resolve (to RESOLVED_PENDING_REVIEW)
-  // ─────────────────────────────────────────────────────────────────────────────
+  // STAFF: resolve
   if (interaction.customId === 'ticket:mod_resolve') {
     if (!member || !memberIsModerator(member)) {
       await interaction.editReply({ content: 'Moderator only.' });
@@ -181,9 +173,7 @@ export async function handleButton(interaction: Interaction) {
     return true;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
   // STAFF: close
-  // ─────────────────────────────────────────────────────────────────────────────
   if (interaction.customId === 'ticket:mod_close') {
     if (!member || !memberIsModerator(member)) {
       await interaction.editReply({ content: 'Moderator only.' });
@@ -211,9 +201,7 @@ export async function handleButton(interaction: Interaction) {
     return true;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // STAFF: archive (respects transcript_enabled toggle)
-  // ─────────────────────────────────────────────────────────────────────────────
+  // STAFF: archive (with runtime checks & hints)
   if (interaction.customId === 'ticket:mod_archive') {
     if (!member || !memberIsModerator(member)) {
       await interaction.editReply({ content: 'Moderator only.' });
@@ -224,10 +212,30 @@ export async function handleButton(interaction: Interaction) {
       return true;
     }
     try {
+      const beforeParent = channel.parentId;
+
       const row = getTicketByChannel(channel.id)!;
       await archiveTicket(ticket.id, channel, row, interaction.user.id);
       await refreshHeader(channel);
-      await interaction.editReply({ content: '📦 **Archived**. Only staff retain access.' });
+
+      // Build hints based on results
+      const g = getGuildSettings(interaction.guild.id);
+      await channel.fetch().catch(() => null);
+      const movedOk = !!(g.tickets_archive_category_id && channel.parentId === g.tickets_archive_category_id);
+
+      const notes: string[] = [];
+      if (!g.tickets_archive_category_id) {
+        notes.push('No archive category configured; channel not moved. Run `/config validate`.');
+      } else if (!movedOk) {
+        notes.push('Could not move channel to the archive category (check Manage Channels & category validity).');
+      }
+      if (!g.audit_log_channel_id) {
+        notes.push('No audit log channel set; audit entry not posted. Run `/config validate`.');
+      }
+
+      const base = '📦 **Archived**. Only staff retain access.';
+      const extra = notes.length ? `\n⚠️ ${notes.join(' ')}` : '';
+      await interaction.editReply({ content: `${base}${extra}` });
 
       await logAction(interaction.guild, 'MOD_ARCHIVE', [
         { name: 'Ticket', value: `<#${channel.id}>` },
@@ -239,12 +247,8 @@ export async function handleButton(interaction: Interaction) {
       if (updated) await updateAuditEntry(interaction.guild, updated);
 
       // Generate & attach transcript if enabled
-      const g = getGuildSettings(interaction.guild.id);
-      if (g.transcript_enabled) {
-        updated = getTicketByChannel(channel.id);
-        if (updated) {
-          await attachTranscriptHTML(interaction.guild, updated);
-        }
+      if (g.transcript_enabled && updated) {
+        await attachTranscriptHTML(interaction.guild, updated);
       }
     } catch (err: any) {
       await interaction.editReply({ content: `Failed: ${err.message ?? 'unknown error'}` });
@@ -252,9 +256,7 @@ export async function handleButton(interaction: Interaction) {
     return true;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // STAFF: reopen (allowed when CLOSED or RESOLVED_PENDING_REVIEW; never when ARCHIVED)
-  // ─────────────────────────────────────────────────────────────────────────────
+  // STAFF: reopen
   if (interaction.customId === 'ticket:mod_reopen') {
     if (!member || !memberIsModerator(member)) {
       await interaction.editReply({ content: 'Moderator only.' });
@@ -289,8 +291,8 @@ export async function handleButton(interaction: Interaction) {
 
 async function refreshHeader(channel: TextChannel) {
   const { getTicketByChannel, saveHeaderMessageId } = await import('../tickets');
-  const ticket = getTicketByChannel(channel.id)!;
 
+  const ticket = getTicketByChannel(channel.id)!;
   const header = ticket.header_message_id
     ? await channel.messages.fetch(ticket.header_message_id).catch(() => null)
     : null;
