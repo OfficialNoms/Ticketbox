@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChannelType } from 'discord.js';
+import { SlashCommandBuilder } from 'discord.js';
 
 export function getCommandBuilders() {
   const ticket = new SlashCommandBuilder()
@@ -39,20 +39,13 @@ export function getCommandBuilders() {
     .addSubcommand(s => s.setName('off').setDescription('Go off duty'))
     .addSubcommand(s => s.setName('status').setDescription('Show who is on duty'));
 
-  const ping = new SlashCommandBuilder()
-    .setName('ping')
-    .setDescription('Replies with pong.');
-
-  const help = new SlashCommandBuilder()
-    .setName('help')
-    .setDescription('How to use Ticketbox and available commands.');
+  const ping = new SlashCommandBuilder().setName('ping').setDescription('Replies with pong.');
+  const help = new SlashCommandBuilder().setName('help').setDescription('How to use Ticketbox and available commands.');
 
   const config = new SlashCommandBuilder()
     .setName('config')
     .setDescription('Guild configuration (admin only)')
-    .addSubcommand(s =>
-      s.setName('show').setDescription('Show current Ticketbox settings for this server')
-    )
+    .addSubcommand(s => s.setName('show').setDescription('Show current Ticketbox settings for this server'))
     .addSubcommand(s =>
       s
         .setName('set')
@@ -73,13 +66,15 @@ export function getCommandBuilders() {
             .setRequired(true)
         )
         .addStringOption(o =>
-          o.setName('value')
-            .setDescription('Value for the setting (IDs/mentions or true/false)')
-            .setRequired(true)
+          o.setName('value').setDescription('Value for the setting (IDs/mentions or true/false)').setRequired(true)
         )
     );
 
-  return [ping, duty, ticket, help, config];
+  const setup = new SlashCommandBuilder()
+    .setName('setup')
+    .setDescription('Post Ticketbox setup instructions in this channel (admin only)');
+
+  return [ping, duty, ticket, help, config, setup];
 }
 
 export function getCommandsJSON() {

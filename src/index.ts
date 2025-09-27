@@ -7,7 +7,7 @@ import {
   Interaction,
 } from 'discord.js';
 
-import './db'; // ensure DB schema initialization
+import './db';
 import { loadConfig } from './config';
 
 // Handlers
@@ -17,6 +17,7 @@ import { handleHelpCommand } from './commands/help';
 import { handleDutyCommand } from './commands/duty';
 import { handleConfigCommand } from './commands/config';
 import { handleTicketCommand } from './commands/ticket';
+import { handleSetupCommand } from './commands/setup';
 
 // First-time setup
 import { bootstrapGuild } from './setup';
@@ -31,7 +32,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent, // for transcript generation when enabled
+    GatewayIntentBits.MessageContent,
   ],
   partials: [Partials.Channel],
 });
@@ -56,7 +57,6 @@ client.once(Events.ClientReady, async (c) => {
     logChannelId: cfg.logChannelId,
   });
 
-  // Bootstrap + auto-register commands for all current guilds
   for (const g of c.guilds.cache.values()) {
     const guild = await g.fetch().catch(() => null);
     if (!guild) continue;
@@ -71,23 +71,19 @@ client.on(Events.GuildCreate, async (guild) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction: Interaction) => {
-  // Route select menus (add/remove participant)
   if (await handleUserSelectMenu(interaction)) return;
-
-  // Route buttons (resolve/close/archive/reopen + open user picker)
   if (await handleButton(interaction)) return;
 
-  // Simple inline command: /ping
   if (interaction.isChatInputCommand() && interaction.commandName === 'ping') {
     await interaction.reply({ content: 'pong', ephemeral: true });
     return;
   }
 
-  // Routed commands
   if (await handleHelpCommand(interaction)) return;
   if (await handleDutyCommand(interaction)) return;
   if (await handleConfigCommand(interaction)) return;
   if (await handleTicketCommand(interaction)) return;
+  if (await handleSetupCommand(interaction)) return;
 });
 
 const token = process.env.DISCORD_TOKEN;

@@ -10,59 +10,9 @@ import { loadConfig } from './config';
 
 const fileCfg = loadConfig();
 
-/**
- * Create an initial guild_config row if one does not exist.
- * Returns true if we created a new row (i.e., first-time setup), false otherwise.
- */
-async function ensureGuildConfig(guild: Guild): Promise<boolean> {
-  const existing = _getGuildConfig.get(guild.id) as any | undefined;
-  if (existing) return false;
-
-  const payload = {
-    guild_id: guild.id,
-    moderator_role_ids: JSON.stringify(fileCfg.moderatorRoleIds ?? []),
-    on_duty_role_id: (fileCfg.onDutyRoleId?.trim() || '') || null,
-    tickets_category_id: (fileCfg.ticketsCategoryId?.trim() || '') || null,
-    tickets_archive_category_id: (fileCfg.ticketsArchiveCategoryId?.trim() || '') || null,
-    log_channel_id: (fileCfg.logChannelId?.trim() || '') || null,
-    audit_log_channel_id: null, // force explicit selection
-    fallback_ping_mod_if_no_on_duty: fileCfg.fallbackPingModeratorIfNoOnDuty ? 1 : 0,
-    transcript_enabled: 1, // default ON
-    updated_at: now(),
-  };
-
-  _upsertGuildConfig.run(payload);
-  return true;
-}
-
-/** Pick a text channel we can send to: system channel if usable, else the first writable text channel. */
-async function pickSetupChannel(guild: Guild): Promise<TextChannel | null> {
-  const me = guild.members.me ?? (await guild.members.fetchMe().catch(() => null));
-  if (!me) return null;
-
-  const canSend = (ch: any) => {
-    const perms = ch.permissionsFor(me);
-    return perms?.has(PermissionFlagsBits.ViewChannel) && perms?.has(PermissionFlagsBits.SendMessages);
-  };
-
-  const sys = guild.systemChannel;
-  if (sys && sys.type === ChannelType.GuildText && canSend(sys)) return sys as TextChannel;
-
-  // fallback: first text channel we can write to
-  for (const ch of guild.channels.cache.values()) {
-    if (ch?.type === ChannelType.GuildText && canSend(ch)) {
-      return ch as TextChannel;
-    }
-  }
-  return null;
-}
-
-/** Post a concise setup message with the essential /config steps. */
-async function postSetupMessage(guild: Guild): Promise<void> {
-  const ch = await pickSetupChannel(guild);
-  if (!ch) return;
-
-  const embed = new EmbedBuilder()
+/** Build the reusable setup embed content. */
+export function createSetupEmbed(): EmbedBuilder {
+  return new EmbedBuilder()
     .setTitle('👋 Ticketbox — First-time setup')
     .setDescription(
       'Thanks for adding Ticketbox! A default config row has been created. ' +
@@ -94,15 +44,68 @@ async function postSetupMessage(guild: Guild): Promise<void> {
           'Ping mods if no on-duty: ```/config set setting:fallback_ping_mod_if_no_on_duty value:on|off```\n' +
           'Transcripts on archive: ```/config set setting:transcript_enabled value:on|off```',
       },
-      {
-        name: 'Check current settings',
-        value: '```/config show```',
-      }
+      { name: 'Check current settings', value: '```/config show```' }
     )
     .setFooter({ text: 'Tip: Use /ticket open to test a ticket once setup is complete.' })
     .setTimestamp(new Date());
+}
 
-  await ch.send({ embeds: [embed] }).catch(() => {});
+/**
+ * Create an initial guild_config row if one does not exist.
+ * Returns true if we created a new row (i.e., first-time setup), false otherwise.
+ */
+async function ensureGuildConfig(guild: Guild): Promise<boolean> {
+  const existing = _getGuildConfig.get(guild.id) as any | undefined;
+  if (existing) return false;
+
+  const payload = {
+    guild_id: guild.id,
+    moderator_role_ids: JSON.stringify(fileCfg.moderatorRoleIds ?? []),
+    on_duty_role_id: (fileCfg.onDutyRoleId?.trim() || '') || null,
+    tickets_category_id: (fileCfg.ticketsCategoryId?.trim() || '') || null,
+    tickets_archive_category_id: (fileCfg.ticketsArchiveCategoryId?.trim() || '') || null,
+    log_channel_id: (fileCfg.logChannelId?.trim() || '') || null,
+    audit_log_channel_id: null, // force explicit selection
+    fallback_ping_mod_if_no_on_duty: fileCfg.fallbackPingModeratorIfNoOnDuty ? 1 : 0,
+    transcript_enabled: 1, // default ON
+    updated_at: now(),
+  };
+
+  _upsertGuildConfig.run(payload);
+  return true;
+}
+
+/** Exported so /setup can reuse the channel-picking logic if needed. */
+export async function pickSetupChannel(guild: Guild): Promise<TextChannel | null> {
+  const me = guild.members.me ?? (await guild.members.fetchMe().catch(() => null));
+  if (!me) return null;
+
+  const canSend = (ch: any) => {
+    const perms = ch.permissionsFor(me);
+    return perms?.has(PermissionFlagsBits.ViewChannel) && perms?.has(PermissionFlagsBits.SendMessages);
+  };
+
+  const sys = guild.systemChannel;
+  if (sys && sys.type === ChannelType.GuildText && canSend(sys)) return sys as TextChannel;
+
+  for (const ch of guild.channels.cache.values()) {
+    if (ch?.type === ChannelType.GuildText && canSend(ch)) {
+      return ch as TextChannel;
+    }
+  }
+  return null;
+}
+
+/** Post the setup embed to a specific channel. */
+export async function sendSetupEmbedToChannel(channel: TextChannel): Promise<void> {
+  await channel.send({ embeds: [createSetupEmbed()] }).catch(() => {});
+}
+
+/** Post a setup embed to the best-available channel. */
+async function postSetupMessage(guild: Guild): Promise<void> {
+  const ch = await pickSetupChannel(guild);
+  if (!ch) return;
+  await sendSetupEmbedToChannel(ch);
 }
 
 /** Public entry: ensure config exists, and post a one-time setup message when we just created it. */
